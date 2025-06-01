@@ -1,70 +1,66 @@
+`timescale 1ns / 1ps
+`default_nettype none
+
 module moore_fsm (
-    input clk,
-    input reset,
-    input [1:0] moneda,
-    input comprarA,
-    input comprarB,
-    output reg listoA,
-    output reg listoB,
-    output reg [3:0] total,
-    output reg vendA,
-    output reg vendB
+    input wire clk,
+    input wire rst,
+    input wire [1:0] moneda,
+    output reg [3:0] total
 );
 
-    reg [2:0] estado, siguiente;
-    reg [3:0] acumulado;
+    typedef enum reg [3:0] {
+        IDLE = 4'd0,
+        M2   = 4'd2,
+        M3   = 4'd3,
+        M4   = 4'd4,
+        M5   = 4'd5,
+        M6   = 4'd6,
+        M7   = 4'd7
+    } state_t;
 
-    localparam IDLE = 3'd0,
-               WAIT = 3'd1;
+    state_t state, next;
 
-    always @(posedge clk or posedge reset) begin
-        if (reset)
-            estado <= IDLE;
+    always @(posedge clk or posedge rst) begin
+        if (rst)
+            state <= IDLE;
         else
-            estado <= siguiente;
-    end
-
-    always @(posedge clk or posedge reset) begin
-        if (reset)
-            acumulado <= 4'd0;
-        else if ((estado == IDLE || estado == WAIT) && moneda != 2'b00) begin
-            case (moneda)
-                2'b01: acumulado <= acumulado + 2;
-                2'b10: acumulado <= acumulado + 3;
-                2'b11: acumulado <= acumulado + 4;
-                default: acumulado <= acumulado;
-            endcase
-        end
+            state <= next;
     end
 
     always @(*) begin
-        siguiente = estado;
-        listoA = 0;
-        listoB = 0;
-        vendA = 0;
-        vendB = 0;
-
-        case (estado)
+        case (state)
             IDLE: begin
-                if (acumulado >= 2)
-                    siguiente = WAIT;
+                case (moneda)
+                    2'd2: next = M2;
+                    2'd3: next = M3;
+                    2'd4: next = M4;
+                    default: next = IDLE;
+                endcase
             end
-            WAIT: begin
-                if (acumulado >= 3 && comprarB) begin
-                    vendB = 1;
-                    listoB = 1;
-                    siguiente = IDLE;
-                end else if (acumulado >= 2 && comprarA) begin
-                    vendA = 1;
-                    listoA = 1;
-                    siguiente = IDLE;
-                end
+            M2: begin
+                case (moneda)
+                    2'd2: next = M4;
+                    2'd3: next = M5;
+                    2'd4: next = M6;
+                    default: next = M2;
+                endcase
             end
+            M3: begin
+                case (moneda)
+                    2'd2: next = M5;
+                    2'd3: next = M6;
+                    2'd4: next = M7;
+                    default: next = M3;
+                endcase
+            end
+            M4, M5, M6, M7: next = IDLE;
+            default: next = IDLE;
         endcase
     end
 
     always @(*) begin
-        total = acumulado;
+        total = state;
     end
 
 endmodule
+
