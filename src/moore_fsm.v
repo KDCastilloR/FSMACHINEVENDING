@@ -12,12 +12,13 @@ module moore_fsm (
 );
 
   // Estados posibles
-  typedef enum logic [2:0] {
-    IDLE = 3'd0,
-    SUMA = 3'd1,  
-    CHEQUEA = 3'd2,
-    ENTREGA = 3'd3
-  } state_t;
+  parameter IDLE = 3'b000;
+parameter SUMA = 3'b001;
+parameter CHEQUEA = 3'b010;
+parameter ENTREGA = 3'b011;
+
+reg [2:0] estado, siguiente;
+
 
   state_t state, next_state;
 
