@@ -1,48 +1,43 @@
-
 `timescale 1ns / 1ps
 
 module moore_fsm (
   input wire clk,
   input wire rst,
-  input wire [1:0] moneda,      // monedas posibles: 2,3,4 (codificadas)
-  input wire [1:0] seleccion,   // producto A=01, B=10, C=11
+  input wire [1:0] moneda,      // monedas codificadas
+  input wire [1:0] seleccion,   // A=01, B=10, C=11
   output reg [1:0] producto,
   output reg listo,
   output reg [1:0] cambio
 );
 
   // Estados posibles
-  parameter IDLE = 3'b000;
-parameter SUMA = 3'b001;
-parameter CHEQUEA = 3'b010;
-parameter ENTREGA = 3'b011;
+  parameter IDLE    = 3'b000;
+  parameter SUMA    = 3'b001;
+  parameter CHEQUEA = 3'b010;
+  parameter ENTREGA = 3'b011;
 
-reg [2:0] estado, siguiente;
-
-
-  state_t state, next_state;
-
-  reg [4:0] total;  // Total acumulado de monedas (hasta 31)
+  reg [2:0] state, next_state;
+  reg [4:0] total;  // total de monedas acumuladas (hasta 31)
 
   // Costos de productos
-  localparam COSTO_A = 5'd4;
-  localparam COSTO_B = 5'd7;
-  localparam COSTO_C = 5'd9;
+  parameter COSTO_A = 5'd4;
+  parameter COSTO_B = 5'd7;
+  parameter COSTO_C = 5'd9;
 
-  // Suma monedas al total si no está en reset
+  // Suma monedas codificadas
   wire [4:0] moneda_val;
-  assign moneda_val = (moneda == 2) ? 5'd2 :
-                      (moneda == 3) ? 5'd3 :
-                      (moneda == 4) ? 5'd4 : 5'd0;
+  assign moneda_val = (moneda == 2'b10) ? 5'd2 :
+                      (moneda == 2'b11) ? 5'd3 :
+                      (moneda == 2'b00) ? 5'd4 : 5'd0;
 
-  // Máquina de estados Moore
+  // Máquina de estados Moore (registro de estado y lógica secuencial)
   always @(posedge clk or posedge rst) begin
     if (rst) begin
-      state <= IDLE;
-      total <= 0;
-      producto <= 0;
-      listo <= 0;
-      cambio <= 0;
+      state    <= IDLE;
+      total    <= 5'd0;
+      producto <= 2'b00;
+      listo    <= 1'b0;
+      cambio   <= 2'b00;
     end else begin
       state <= next_state;
 
@@ -51,51 +46,58 @@ reg [2:0] estado, siguiente;
         total <= total + moneda_val;
       end
 
-      // En ENTREGA, calcular producto, listo y cambio
+      // En ENTREGA: entregar producto y cambio
       if (state == ENTREGA) begin
-        listo <= 1;
+        listo <= 1'b1;
         case (seleccion)
-          2'b01: begin
-            producto <= 2'b01; // Producto A
+          2'b01: begin // Producto A
+            producto <= 2'b01;
             cambio <= total - COSTO_A;
           end
-          2'b10: begin
-            producto <= 2'b10; // Producto B
+          2'b10: begin // Producto B
+            producto <= 2'b10;
             cambio <= total - COSTO_B;
           end
-          2'b11: begin
-            producto <= 2'b11; // Producto C
+          2'b11: begin // Producto C
+            producto <= 2'b11;
             cambio <= total - COSTO_C;
           end
           default: begin
-            producto <= 0;
-            cambio <= 0;
+            producto <= 2'b00;
+            cambio   <= 2'b00;
           end
         endcase
       end else begin
-        listo <= 0;
-        producto <= 0;
-        cambio <= 0;
+        // Si no está en ENTREGA, no hay producto ni cambio listos
+        listo    <= 1'b0;
+        producto <= 2'b00;
+        cambio   <= 2'b00;
       end
     end
   end
 
-  // Próximo estado
+  // Lógica de transición de estados (combinacional)
   always @(*) begin
     case (state)
       IDLE: next_state = SUMA;
+
       SUMA: begin
-        // Si el total es suficiente para el producto seleccionado, chequea entrega
-        if (seleccion == 2'b01 && total >= COSTO_A) next_state = CHEQUEA;
-        else if (seleccion == 2'b10 && total >= COSTO_B) next_state = CHEQUEA;
-        else if (seleccion == 2'b11 && total >= COSTO_C) next_state = CHEQUEA;
-        else next_state = SUMA;
+        if ((seleccion == 2'b01 && total >= COSTO_A) ||
+            (seleccion == 2'b10 && total >= COSTO_B) ||
+            (seleccion == 2'b11 && total >= COSTO_C))
+          next_state = CHEQUEA;
+        else
+          next_state = SUMA;
       end
+
       CHEQUEA: next_state = ENTREGA;
+
       ENTREGA: next_state = IDLE;
+
       default: next_state = IDLE;
     endcase
   end
 
 endmodule
+
 
